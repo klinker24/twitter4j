@@ -1,5 +1,26 @@
 Twitter4J is a Twitter API binding library for the Java language licensed under Apache License 2.0.
 
+# Packaging Twitter4j
+
+First install `mvn`. When I installed it on Ubuntu, my `M2_HOME` variable didn't get set up correctly. To set the `M2_HOME`:
+
+```
+$ export M2_HOME=/usr/share/maven
+```
+
+Packaging the repo after that is as easy as:
+
+```
+$ mvn package
+
+// if there are failing tests, you will have to skip them if you want it to get packaged
+$ mvn package -Dmaven.test.skip=true
+```
+
+The output `.jar` files will be in the `/target/` directory of the version you want to build (ie: `twitter4j-core`).
+
+# Acknowledgement
+
 Twitter4J includes software from JSON.org to parse JSON response from the Twitter API. You can see the license term at http://www.JSON.org/license.html
 
 LICENSE.txt - the terms of license of this software
