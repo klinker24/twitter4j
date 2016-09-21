@@ -40,6 +40,7 @@ public final class StatusUpdate implements java.io.Serializable {
     private File mediaFile;
     private long[] mediaIds;
     private String attachmentUrl = null;
+    private boolean autoPopulate = false;
 
     public StatusUpdate(String status) {
         this.status = status;
@@ -150,6 +151,19 @@ public final class StatusUpdate implements java.io.Serializable {
         return this;
     }
 
+    public boolean getAutoPopulateReplyMetadata() {
+    	return autoPopulate;
+    }
+
+    public void setAutoPopulateReplyMetadata(boolean autoPopulate) {
+    	this.autoPopulate = autoPopulate;
+    }
+
+    public StatusUpdate autoPopulateReplyMetadata(boolean autoPopulate) {
+    	setAutoPopulateReplyMetadata(autoPopulate);
+    	return this;
+    }
+
     /*package*/ boolean isForUpdateWithMedia() {
         return mediaFile != null || mediaName != null;
     }
@@ -216,6 +230,7 @@ public final class StatusUpdate implements java.io.Serializable {
             params.add(new HttpParameter("media_ids", StringUtil.join(mediaIds)));
         }
         appendParameter("attachment_url", attachmentUrl, params);
+        params.add(new HttpParameter("auto_populate_reply_metadata", autoPopulate));
         HttpParameter[] paramArray = new HttpParameter[params.size()];
         return params.toArray(paramArray);
     }
