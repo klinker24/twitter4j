@@ -19,10 +19,32 @@ $ mvn package -Dmaven.test.skip=true
 
 The output `.jar` files will be in the `/target/` directory of the version you want to build (ie: `twitter4j-core`).
 
+## To merge a Pull Request
+
+Checkout a new branch to test on:
+
+```
+$ git checkout -b pull_request
+```
+
+Merge the pull request into that branch
+
+```
+$ git pull git@github.com/user/twitter4j.git pull_request_branch
+```
+
+Test it, then merge back into `master`
+
+```
+$ git checkout master
+$ git merge pull_request
+```
+
 # Acknowledgement
 
 Twitter4J includes software from JSON.org to parse JSON response from the Twitter API. You can see the license term at http://www.JSON.org/license.html
 
+```
 LICENSE.txt - the terms of license of this software
 pom.xml - maven parent pom
 powered-by-badge - badge
@@ -34,7 +56,9 @@ twitter4j-media-support - media API support
 twitter4j-async - Async API support : depending on twitter4j-core
 twitter4j-stream - Streaming API support : depending on twitter4j-core and twitter4j-async
 twitter4j-http2-support - HTTP/2 support : adds HTTP/2 support, boosts Twitter4J performance, reduce packets, save the earth
+```
 
+```
 Contributors
 ------------
 Aaron Rankin <aaron at sproutsocial.com> @aaronrankin
@@ -139,3 +163,4 @@ withgod <noname at withgod.jp> @withgod
 Yuichiro Kawano <tresener.yu1ro at gmail.com> @tresener_yu1ro
 Yusuke Yamamoto <yusuke at mac.com> @yusuke
 Yuto Uehara <mumei.himazin at gmail.com> @mumei_himazin
+```
