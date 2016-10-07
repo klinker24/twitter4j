@@ -23,10 +23,8 @@ import twitter4j.conf.Configuration;
 
 import java.io.*;
 import java.net.URLEncoder;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.security.InvalidParameterException;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static twitter4j.HttpParameter.getParameterArray;
@@ -40,9 +38,16 @@ import static twitter4j.HttpParameter.getParameterArray;
  */
 class TwitterImpl extends TwitterBaseImpl implements Twitter {
     private static final long serialVersionUID = 9170943084096085770L;
+    private static final int MB = 1024 * 1024; //1 MByte
+    private static final int MAX_VIDEO_SIZE = 15 * MB; //15MB is a constraint imposed by Twitter for video files
+    private static final int MAX_CHUNK_SIZE = 5 * MB; //max chunk size
     private final String IMPLICIT_PARAMS_STR;
     private final HttpParameter[] IMPLICIT_PARAMS;
     private final HttpParameter INCLUDE_MY_RETWEET;
+
+    private static final String CHUNKED_INIT = "INIT";
+    private static final String CHUNKED_APPEND = "APPEND";
+    private static final String CHUNKED_FINALIZE = "FINALIZE";
 
     private static final ConcurrentHashMap<Configuration, HttpParameter[]> implicitParamsMap = new ConcurrentHashMap<Configuration, HttpParameter[]>();
     private static final ConcurrentHashMap<Configuration, String> implicitParamsStrMap = new ConcurrentHashMap<Configuration, String>();
@@ -240,14 +245,69 @@ class TwitterImpl extends TwitterBaseImpl implements Twitter {
     @Override
     public UploadedMedia uploadMedia(File image) throws TwitterException {
         checkFileValidity(image);
-        return new UploadedMedia(post(conf.getUploadBaseURL() + "media/upload.json"
-                , new HttpParameter("media", image)).asJSONObject());
+        return new UploadedMedia(post(conf.getUploadBaseURL() + "media/upload.json",
+                new HttpParameter("media", image)).asJSONObject());
     }
 
     @Override
     public UploadedMedia uploadMedia(String fileName, InputStream image) throws TwitterException {
-        return new UploadedMedia(post(conf.getUploadBaseURL() + "media/upload.json"
-                , new HttpParameter("media", fileName, image)).asJSONObject());
+        return new UploadedMedia(post(conf.getUploadBaseURL() + "media/upload.json",
+                new HttpParameter("media", fileName, image)).asJSONObject());
+    }
+
+    @Override
+    public UploadedMedia uploadVideo(File video) throws TwitterException, IOException {
+        if (video == null) throw new InvalidParameterException("video file can't be null");
+        //verify file length
+        if (!video.exists()) throw new InvalidParameterException("video file doesn't exists'");
+        final long size = video.length();
+        if (size > MAX_VIDEO_SIZE) {
+            throw new InvalidParameterException(
+                    String.format(Locale.US, "video file can't be longer than: %d MBytes", MAX_VIDEO_SIZE / MB));
+        }
+        //split file
+        int count = (int) Math.ceil(size / (float) MAX_CHUNK_SIZE);
+        UploadedMedia uploadedMedia = uploadMediaChunkedInit(size);
+        for (int i = 0; i < count; i++) {
+            LimitedFileInputStream limitedFileInputStream =
+                    new LimitedFileInputStream(video, i * MAX_CHUNK_SIZE, MAX_CHUNK_SIZE);
+            uploadMediaChunkedAppend(video.getAbsolutePath(), limitedFileInputStream, uploadedMedia.getMediaId(), i);
+        }
+        return uploadMediaChunkedFinalize(uploadedMedia.getMediaId());
+    }
+
+    // twurl -H upload.twitter.com "/1.1/media/upload.json" -d
+    // "command=INIT&media_type=video/mp4&total_bytes=4430752"
+
+    private UploadedMedia uploadMediaChunkedInit(long size) throws TwitterException {
+        return new UploadedMedia(post(
+                conf.getUploadBaseURL() + "media/upload.json",
+                new HttpParameter("command", CHUNKED_INIT),
+                new HttpParameter("media_type", "video/mp4"),
+                new HttpParameter("total_bytes", size))
+                .asJSONObject());
+    }
+
+    // twurl -H upload.twitter.com "/1.1/media/upload.json" -d
+    // "command=APPEND&media_id=601413451156586496&segment_index=0" --file
+    // /path/to/video.mp4 --file-field "media"
+
+    private HttpResponse uploadMediaChunkedAppend(String filename, FileInputStream fileInputStream, long mediaId, int segmentIndex) throws TwitterException {
+        return post(conf.getUploadBaseURL() + "media/upload.json",
+                new HttpParameter("command", CHUNKED_APPEND),
+                new HttpParameter("media_id", mediaId),
+                new HttpParameter("segment_index", segmentIndex),
+                new HttpParameter("media", filename, fileInputStream));
+    }
+
+    // twurl -H upload.twitter.com "/1.1/media/upload.json" -d
+    // "command=FINALIZE&media_id=601413451156586496"
+
+    private UploadedMedia uploadMediaChunkedFinalize(long mediaId) throws TwitterException {
+        return new UploadedMedia(
+                post(conf.getUploadBaseURL() + "media/upload.json",
+                        new HttpParameter("command", CHUNKED_FINALIZE),
+                        new HttpParameter("media_id", mediaId)).asJSONObject());
     }
 
     /* Search Resources */
@@ -584,7 +644,7 @@ class TwitterImpl extends TwitterBaseImpl implements Twitter {
         return super.fillInIDAndScreenName(
                 new HttpParameter[]{new HttpParameter("include_email", conf.isIncludeEmailEnabled())});
     }
-    
+
     @Override
     public AccountSettings updateAccountSettings(Integer trend_locationWoeid,
                                                  Boolean sleep_timeEnabled, String start_sleepTime,
