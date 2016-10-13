@@ -30,7 +30,7 @@ $ git checkout -b pull_request
 Merge the pull request into that branch
 
 ```
-$ git pull git@github.com/user/twitter4j.git pull_request_branch
+$ git pull git@github.com:<user>/twitter4j.git <pull_request_branch>
 ```
 
 Test it, then merge back into `master`
