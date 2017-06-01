@@ -64,9 +64,16 @@ class TwitterImpl extends TwitterBaseImpl implements Twitter {
             boolean contributorsEnabled = conf.getContributingTo() != -1L;
             if (contributorsEnabled) {
                 if (!"".equals(implicitParamsStr)) {
-                    implicitParamsStr += "?";
+                    implicitParamsStr += "&";
                 }
                 implicitParamsStr += "contributingto=" + conf.getContributingTo();
+            }
+
+            if (conf.isTweetModeExtended()) {
+                if (!"".equals(implicitParamsStr)) {
+                    implicitParamsStr += "&";
+                }
+                implicitParamsStr += "tweet_mode=extended";
             }
 
             List<HttpParameter> params = new ArrayList<HttpParameter>(3);
@@ -310,6 +317,40 @@ class TwitterImpl extends TwitterBaseImpl implements Twitter {
                         new HttpParameter("media_id", mediaId)).asJSONObject());
     }
 
+    // twurl -H upload.twitter.com "/1.1/media/upload.json" -d
+    // "command=INIT&media_type=video/mp4&total_bytes=4430752"
+
+    private UploadedMedia uploadMediaChunkedInit(long size) throws TwitterException {
+        return new UploadedMedia(post(
+                conf.getUploadBaseURL() + "media/upload.json",
+                new HttpParameter("command", CHUNKED_INIT),
+                new HttpParameter("media_type", "video/mp4"),
+                new HttpParameter("total_bytes", size))
+                .asJSONObject());
+    }
+
+    // twurl -H upload.twitter.com "/1.1/media/upload.json" -d
+    // "command=APPEND&media_id=601413451156586496&segment_index=0" --file
+    // /path/to/video.mp4 --file-field "media"
+
+    private HttpResponse uploadMediaChunkedAppend(String filename, FileInputStream fileInputStream, long mediaId, int segmentIndex) throws TwitterException {
+        return post(conf.getUploadBaseURL() + "media/upload.json",
+                new HttpParameter("command", CHUNKED_APPEND),
+                new HttpParameter("media_id", mediaId),
+                new HttpParameter("segment_index", segmentIndex),
+                new HttpParameter("media", filename, fileInputStream));
+    }
+
+    // twurl -H upload.twitter.com "/1.1/media/upload.json" -d
+    // "command=FINALIZE&media_id=601413451156586496"
+
+    private UploadedMedia uploadMediaChunkedFinalize(long mediaId) throws TwitterException {
+        return new UploadedMedia(
+                post(conf.getUploadBaseURL() + "media/upload.json",
+                        new HttpParameter("command", CHUNKED_FINALIZE),
+                        new HttpParameter("media_id", mediaId)).asJSONObject());
+    }
+    
     /* Search Resources */
 
     @Override
@@ -359,6 +400,21 @@ class TwitterImpl extends TwitterBaseImpl implements Twitter {
         TwitterException {
         return factory.createDirectMessage(post(conf.getRestBaseURL() + "direct_messages/destroy.json?id=" + id
             + "&full_text=true"));
+    }
+
+    @Override
+    public DirectMessageEvent createMessage(MessageData messageData)
+            throws TwitterException {
+        try {
+            final JSONObject json = new JSONObject();
+            final JSONObject event = new JSONObject();
+            event.put("type", "message_create");
+            event.put("message_create", messageData.createMessageCreateJsonObject());
+            json.put("event", event);
+            return factory.createDirectMessageEvent(post(conf.getRestBaseURL() + "direct_messages/events/new.json", json));
+        } catch (JSONException e) {
+            throw new TwitterException(e);
+        }
     }
 
     @Override
@@ -1879,6 +1935,24 @@ class TwitterImpl extends TwitterBaseImpl implements Twitter {
             long start = System.currentTimeMillis();
             try {
                 response = http.post(url, mergeImplicitParams(params), auth, this);
+            } finally {
+                long elapsedTime = System.currentTimeMillis() - start;
+                TwitterAPIMonitor.getInstance().methodCalled(url, elapsedTime, isOk(response));
+            }
+            return response;
+        }
+    }
+
+    private HttpResponse post(String url, JSONObject json) throws TwitterException {
+        ensureAuthorizationEnabled();
+        if (!conf.isMBeanEnabled()) {
+            return http.post(url, new HttpParameter[]{new HttpParameter(json)}, auth, this);
+        } else {
+            // intercept HTTP call for monitoring purposes
+            HttpResponse response = null;
+            long start = System.currentTimeMillis();
+            try {
+                response = http.post(url, new HttpParameter[]{new HttpParameter(json)}, auth, this);
             } finally {
                 long elapsedTime = System.currentTimeMillis() - start;
                 TwitterAPIMonitor.getInstance().methodCalled(url, elapsedTime, isOk(response));
