@@ -50,7 +50,13 @@ public class AlternativeHttpClientImpl extends HttpClientBase implements HttpRes
     private static final MediaType FORM_URL_ENCODED = MediaType.parse("application/x-www-form-urlencoded");
     private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
 
+    public interface OnBuildOkHttpClientCallback {
+        void onBuildOkHttpClient(OkHttpClient.Builder builder);
+    }
+
     private OkHttpClient okHttpClient;
+
+    private static OnBuildOkHttpClientCallback onBuildOkHttpClient = null;
 
     //for test
     public static boolean sPreferSpdy = true;
@@ -64,7 +70,6 @@ public class AlternativeHttpClientImpl extends HttpClientBase implements HttpRes
     public AlternativeHttpClientImpl(HttpClientConfiguration conf) {
         super(conf);
     }
-
 
     @Override
     HttpResponse handleRequest(HttpRequest req) throws TwitterException {
@@ -292,8 +297,17 @@ public class AlternativeHttpClientImpl extends HttpClientBase implements HttpRes
                 builder.readTimeout(CONF.getHttpReadTimeout(), TimeUnit.MILLISECONDS);
             }
 
+            // fix TLS1.2 etc...
+            if (onBuildOkHttpClient != null) {
+                onBuildOkHttpClient.onBuildOkHttpClient(builder);
+            }
+
             okHttpClient = builder.build();
         }
+    }
+
+    public static void setOnBuildOkHttpClient(OnBuildOkHttpClientCallback callback) {
+        onBuildOkHttpClient = callback;
     }
 
     //for test
