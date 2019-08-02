@@ -316,40 +316,6 @@ class TwitterImpl extends TwitterBaseImpl implements Twitter {
                         new HttpParameter("command", CHUNKED_FINALIZE),
                         new HttpParameter("media_id", mediaId)).asJSONObject());
     }
-
-    // twurl -H upload.twitter.com "/1.1/media/upload.json" -d
-    // "command=INIT&media_type=video/mp4&total_bytes=4430752"
-
-    private UploadedMedia uploadMediaChunkedInit(long size) throws TwitterException {
-        return new UploadedMedia(post(
-                conf.getUploadBaseURL() + "media/upload.json",
-                new HttpParameter("command", CHUNKED_INIT),
-                new HttpParameter("media_type", "video/mp4"),
-                new HttpParameter("total_bytes", size))
-                .asJSONObject());
-    }
-
-    // twurl -H upload.twitter.com "/1.1/media/upload.json" -d
-    // "command=APPEND&media_id=601413451156586496&segment_index=0" --file
-    // /path/to/video.mp4 --file-field "media"
-
-    private HttpResponse uploadMediaChunkedAppend(String filename, FileInputStream fileInputStream, long mediaId, int segmentIndex) throws TwitterException {
-        return post(conf.getUploadBaseURL() + "media/upload.json",
-                new HttpParameter("command", CHUNKED_APPEND),
-                new HttpParameter("media_id", mediaId),
-                new HttpParameter("segment_index", segmentIndex),
-                new HttpParameter("media", filename, fileInputStream));
-    }
-
-    // twurl -H upload.twitter.com "/1.1/media/upload.json" -d
-    // "command=FINALIZE&media_id=601413451156586496"
-
-    private UploadedMedia uploadMediaChunkedFinalize(long mediaId) throws TwitterException {
-        return new UploadedMedia(
-                post(conf.getUploadBaseURL() + "media/upload.json",
-                        new HttpParameter("command", CHUNKED_FINALIZE),
-                        new HttpParameter("media_id", mediaId)).asJSONObject());
-    }
     
     /* Search Resources */
 
