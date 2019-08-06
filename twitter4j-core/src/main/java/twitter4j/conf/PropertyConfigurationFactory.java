@@ -22,7 +22,7 @@ package twitter4j.conf;
  *
  * @author Yusuke Yamamoto - yusuke at mac.com
  */
-class PropertyConfigurationFactory implements ConfigurationFactory {
+public class PropertyConfigurationFactory implements ConfigurationFactory {
     private static final PropertyConfiguration ROOT_CONFIGURATION;
 
     static {
